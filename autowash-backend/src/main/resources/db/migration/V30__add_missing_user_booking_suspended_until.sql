@@ -1,0 +1,2 @@
+ALTER TABLE users
+ADD COLUMN IF NOT EXISTS booking_suspended_until TIMESTAMP WITH TIME ZONE;

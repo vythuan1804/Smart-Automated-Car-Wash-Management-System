@@ -7,7 +7,7 @@ import type { ComponentType, ReactNode } from "react";
 import { ArrowRightFromLine, Home, PackageSearch, CarFront, Gift, Bell, History, Sparkles } from "lucide-react";
 import { getAuthRedirectPath } from "@/features/auth/lib/auth-session";
 import { useCustomerLogout } from "@/features/auth/hooks/use-auth";
-import { useAuthStore } from "@/features/auth/store/auth.store";
+import { hydrateAuthSession, useAuthStore } from "@/features/auth/store/auth.store";
 import { useLanguageStore, translate } from "@/shared/store/language.store";
 import { cn } from "@/shared/lib/utils";
 
@@ -20,17 +20,19 @@ export function CustomerWorkspaceShell({
   const logoutMutation = useCustomerLogout();
   const accessToken = useAuthStore((state) => state.accessToken);
   const user = useAuthStore((state) => state.user);
+  const hasHydrated = useAuthStore((state) => state.hasHydrated);
   const { language } = useLanguageStore();
   const [isMounted, setIsMounted] = useState(false);
 
   const t = (vi: string, en: string) => translate(language, vi, en);
 
   useEffect(() => {
+    hydrateAuthSession();
     setIsMounted(true);
   }, []);
 
   useEffect(() => {
-    if (!isMounted) {
+    if (!isMounted || !hasHydrated) {
       return;
     }
 
@@ -42,9 +44,9 @@ export function CustomerWorkspaceShell({
     if (user.role !== "CUSTOMER") {
       router.replace(getAuthRedirectPath(user.role));
     }
-  }, [accessToken, isMounted, router, user]);
+  }, [accessToken, hasHydrated, isMounted, router, user]);
 
-  if (!isMounted) {
+  if (!isMounted || !hasHydrated) {
     return <main style={{ padding: 24 }}>{t("Đang tải khu vực làm việc...", "Loading workspace...")}</main>;
   }
 

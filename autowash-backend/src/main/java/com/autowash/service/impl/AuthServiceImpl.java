@@ -19,6 +19,7 @@ import com.autowash.repository.OtpVerificationRepository;
 import com.autowash.repository.RefreshTokenRepository;
 import com.autowash.repository.UserPreferenceRepository;
 import com.autowash.service.AuthService;
+import com.autowash.service.EmailDomainValidator;
 import com.autowash.service.EmailDeliveryService;
 import com.autowash.service.JwtService;
 import com.autowash.service.OtpService;
@@ -40,6 +41,7 @@ public class AuthServiceImpl implements AuthService {
     private final LoyaltyAccountRepository loyaltyAccountRepository;
     private final PasswordEncoder passwordEncoder;
     private final OtpService otpService;
+    private final EmailDomainValidator emailDomainValidator;
     private final EmailDeliveryService emailDeliveryService;
     private final JwtService jwtService;
     private final long otpExpirationSeconds;
@@ -55,6 +57,7 @@ public class AuthServiceImpl implements AuthService {
             LoyaltyAccountRepository loyaltyAccountRepository,
             PasswordEncoder passwordEncoder,
             OtpService otpService,
+            EmailDomainValidator emailDomainValidator,
             EmailDeliveryService emailDeliveryService,
             JwtService jwtService,
             @Value("${autowash.auth.otp.expiration-seconds}") long otpExpirationSeconds,
@@ -69,6 +72,7 @@ public class AuthServiceImpl implements AuthService {
         this.loyaltyAccountRepository = loyaltyAccountRepository;
         this.passwordEncoder = passwordEncoder;
         this.otpService = otpService;
+        this.emailDomainValidator = emailDomainValidator;
         this.emailDeliveryService = emailDeliveryService;
         this.jwtService = jwtService;
         this.otpExpirationSeconds = otpExpirationSeconds;
@@ -82,6 +86,7 @@ public class AuthServiceImpl implements AuthService {
         if (UserRepository.existsByEmailIgnoreCase(request.email())) {
             throw new ApiException(HttpStatus.CONFLICT, "Email already registered", "DUPLICATE_EMAIL");
         }
+        validateEmailDomain(request.email());
 
         User user = new User(
                 request.fullName(),
@@ -109,6 +114,7 @@ public class AuthServiceImpl implements AuthService {
         User user = resolveEmailUser(email)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Account not found", "RESOURCE_NOT_FOUND"));
         requirePendingUser(user);
+        validateEmailDomain(user.getEmail());
         enforceResendLimit(user);
 
         return issueRegistrationOtp(user, metadata, true);
@@ -308,6 +314,16 @@ public class AuthServiceImpl implements AuthService {
                     HttpStatus.UNPROCESSABLE_ENTITY,
                     "Account is not pending OTP verification",
                     "RESOURCE_LOCKED"
+            );
+        }
+    }
+
+    private void validateEmailDomain(String email) {
+        if (!emailDomainValidator.canReceiveEmail(email)) {
+            throw new ApiException(
+                    HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Email domain cannot receive email",
+                    "INVALID_EMAIL_DOMAIN"
             );
         }
     }

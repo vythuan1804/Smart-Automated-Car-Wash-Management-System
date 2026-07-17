@@ -33,7 +33,7 @@ import { toast } from "sonner";
 import { useCustomerLogout } from "@/features/auth/hooks/use-auth";
 import { getAuthRedirectPath } from "@/features/auth/lib/auth-session";
 import { cn } from "@/shared/lib/utils";
-import { clearAuthSession, useAuthStore } from "@/features/auth/store/auth.store";
+import { clearAuthSession, hydrateAuthSession, useAuthStore } from "@/features/auth/store/auth.store";
 import type { UserRole } from "@/entities/auth";
 import { getWorkspaceHeaderMeta } from "@/shared/ui/workspace/workspace-header-meta";
 import {
@@ -106,6 +106,7 @@ export function RoleWorkspaceShell({ requiredRole, children }: RoleWorkspaceShel
   const logoutMutation = useCustomerLogout();
   const accessToken = useAuthStore((state) => state.accessToken);
   const user = useAuthStore((state) => state.user);
+  const hasHydrated = useAuthStore((state) => state.hasHydrated);
   const [isMounted, setIsMounted] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -200,7 +201,10 @@ export function RoleWorkspaceShell({ requiredRole, children }: RoleWorkspaceShel
     hydrateLanguage();
   }, [hydrateLanguage]);
 
-  useEffect(() => { setIsMounted(true); }, []);
+  useEffect(() => {
+    hydrateAuthSession();
+    setIsMounted(true);
+  }, []);
   useEffect(() => { setMobileMenuOpen(false); }, [pathname]);
   useEffect(() => { fetchTiers(); }, [fetchTiers]);
 
@@ -263,7 +267,7 @@ export function RoleWorkspaceShell({ requiredRole, children }: RoleWorkspaceShel
   }, [alertNotification.show]);
 
   useEffect(() => {
-    if (!isMounted || isExcluded) return;
+    if (!isMounted || !hasHydrated || isExcluded) return;
     if (!accessToken || !user) {
       router.replace(requiredRole === "ADMIN" ? "/admin/login" : "/login");
       return;
@@ -271,11 +275,11 @@ export function RoleWorkspaceShell({ requiredRole, children }: RoleWorkspaceShel
     if (user.role !== requiredRole) {
       router.replace(getAuthRedirectPath(user.role));
     }
-  }, [accessToken, isExcluded, isMounted, requiredRole, router, user]);
+  }, [accessToken, hasHydrated, isExcluded, isMounted, requiredRole, router, user]);
 
   if (isExcluded) return <>{children}</>;
 
-  if (!isMounted) return <WorkspaceGate message={t("Đang tải khu vực làm việc...", "Loading workspace...")} />;
+  if (!isMounted || !hasHydrated) return <WorkspaceGate message={t("Đang tải khu vực làm việc...", "Loading workspace...")} />;
   if (!accessToken || !user) return <WorkspaceGate message={t("Đang chuyển đến trang đăng nhập...", "Redirecting to login...")} />;
   if (user.role !== requiredRole) return <WorkspaceGate message={t("Đang chuyển đến khu vực phù hợp...", "Redirecting to your workspace...")} />;
 

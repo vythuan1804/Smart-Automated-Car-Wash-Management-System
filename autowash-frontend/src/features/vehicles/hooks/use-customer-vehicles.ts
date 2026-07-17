@@ -30,7 +30,7 @@ function useVehicleQueryContext() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const user = useAuthStore((state) => state.user);
   const userId = user?.userId ?? null;
-  const enabled = Boolean(accessToken && userId && user?.role === "CUSTOMER");
+  const enabled = Boolean(accessToken && (!user || user.role === "CUSTOMER"));
 
   return { userId, enabled };
 }

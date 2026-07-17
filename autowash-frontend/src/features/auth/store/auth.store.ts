@@ -13,9 +13,11 @@ type AuthState = {
   refreshToken: string | null;
   expiresAt: number | null;
   user: AuthUser | null;
+  hasHydrated: boolean;
 };
 
 type AuthActions = {
+  hydrate: () => void;
   setSession: (session: AuthSession) => void;
   setAccessToken: (accessToken: string, expiresIn: number) => void;
   setUser: (user: AuthUser | null) => void;
@@ -31,6 +33,18 @@ const authStore = createStore<AuthStore>()((set, get) => ({
   refreshToken: persistedState?.refreshToken ?? null,
   expiresAt: persistedState?.expiresAt ?? null,
   user: persistedState?.user ?? null,
+  hasHydrated: false,
+  hydrate: () =>
+    set(() => {
+      const persistedState = readPersistedAuthState();
+      return {
+        accessToken: persistedState?.accessToken ?? null,
+        refreshToken: persistedState?.refreshToken ?? null,
+        expiresAt: persistedState?.expiresAt ?? null,
+        user: persistedState?.user ?? null,
+        hasHydrated: true,
+      };
+    }),
   setSession: (session) =>
     set(() => {
       const nextState = {
@@ -38,6 +52,7 @@ const authStore = createStore<AuthStore>()((set, get) => ({
         refreshToken: session.refreshToken,
         expiresAt: Date.now() + session.expiresIn * 1000,
         user: session.user,
+        hasHydrated: true,
       };
       writePersistedAuthState(nextState);
       return nextState;
@@ -93,6 +108,7 @@ const authStore = createStore<AuthStore>()((set, get) => ({
         refreshToken: null,
         expiresAt: null,
         user: null,
+        hasHydrated: true,
       };
     }),
 }));
@@ -107,6 +123,10 @@ export function getAuthState() {
 
 export function setAuthSession(session: AuthSession) {
   authStore.getState().setSession(session);
+}
+
+export function hydrateAuthSession() {
+  authStore.getState().hydrate();
 }
 
 export function setAccessToken(accessToken: string, expiresIn: number) {
