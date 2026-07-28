@@ -451,8 +451,6 @@ public class BookingServiceImpl implements BookingService {
                 .build());
         }
 
-        booking.setPreferredStaffIds(normalizePreferredStaffIds(request.staffIds(), request.staffId()));
-
         BookingRepository.save(booking);
 
         // Apply discount if provided
