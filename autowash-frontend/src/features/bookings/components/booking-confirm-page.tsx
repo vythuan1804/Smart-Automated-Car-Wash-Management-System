@@ -34,7 +34,6 @@ import {
   useBookingAddons,
   useBookingCombos,
   useBookingPackages,
-  useBookingStaffOptions,
   useCreateCustomerBooking,
   useCreateVnpayCheckout,
 } from "@/features/bookings/hooks/use-bookings";
@@ -175,31 +174,6 @@ export function BookingConfirmPage() {
       }),
     [addons, combos, packages, sanitizedDraft, selectedCustomerCombo, validatedDiscount],
   );
-  const staffOptionsPayload = useMemo(() => {
-    if (hasStaleAddonIds) return null;
-    if (!sanitizedDraft.bookingDate || !sanitizedDraft.bookingTime) return null;
-    if (sanitizedDraft.mode === "PACKAGE" && !sanitizedDraft.packageId) return null;
-    if (sanitizedDraft.mode === "COMBO" && !sanitizedDraft.comboId) return null;
-
-    return {
-      packageId: sanitizedDraft.mode === "PACKAGE" ? sanitizedDraft.packageId : undefined,
-      comboId: sanitizedDraft.mode === "COMBO" ? sanitizedDraft.comboId : undefined,
-      options: sanitizedAddonIds,
-      bookingDate: sanitizedDraft.bookingDate,
-      bookingTime: sanitizedDraft.bookingTime,
-    };
-  }, [hasStaleAddonIds, sanitizedAddonIds, sanitizedDraft]);
-  const staffOptionsQuery = useBookingStaffOptions(staffOptionsPayload);
-  const staffOptions = staffOptionsQuery.data ?? [];
-  const availableStaffOptions = useMemo(
-    () => staffOptions.filter((staff) => staff.available !== false),
-    [staffOptions],
-  );
-  const selectedStaffIds = useMemo(
-    () => (draft.staffIds && draft.staffIds.length > 0 ? draft.staffIds : draft.staffId ? [draft.staffId] : []).slice(0, 1),
-    [draft.staffId, draft.staffIds],
-  );
-  const staffUnavailable = staffOptionsQuery.isSuccess && availableStaffOptions.length < 1;
 
   const redirectToLastCreatedBooking = useCallback(
     (bookingId?: string) => {
@@ -225,23 +199,6 @@ export function BookingConfirmPage() {
     if (!hasStaleAddonIds) return;
     updateDraft({ addonIds: sanitizedAddonIds, discountCode: "", staffId: "", staffIds: [] });
   }, [hasStaleAddonIds, sanitizedAddonIds, updateDraft]);
-
-  useEffect(() => {
-    if (staffOptions.length === 0) return;
-    const availableIds = new Set(availableStaffOptions.map((staff) => staff.staffId));
-    const nextStaffIds = selectedStaffIds.filter((staffId) => availableIds.has(staffId));
-    for (const staff of availableStaffOptions) {
-      if (nextStaffIds.length >= 1) break;
-      if (!nextStaffIds.includes(staff.staffId)) {
-        nextStaffIds.push(staff.staffId);
-      }
-    }
-    const currentKey = selectedStaffIds.join("|");
-    const nextKey = nextStaffIds.join("|");
-    if (nextKey !== currentKey || draft.staffId !== (nextStaffIds[0] ?? "")) {
-      updateDraft({ staffId: nextStaffIds[0] ?? "", staffIds: nextStaffIds });
-    }
-  }, [availableStaffOptions, draft.staffId, selectedStaffIds, staffOptions.length, updateDraft]);
 
   useEffect(() => {
     if (expired || isRedirectingAfterCreate) return;
@@ -334,14 +291,6 @@ export function BookingConfirmPage() {
   const isComboBooking = draft.mode === "COMBO" && Boolean(selectedCustomerCombo);
   const handleConfirm = async () => {
     setShowPaymentError(true);
-    if (staffUnavailable) {
-      toast.error("No staff is available for this service window.");
-      return;
-    }
-    if (selectedStaffIds.length < 1) {
-      toast.error("Please select an available staff.");
-      return;
-    }
     const selectedPaymentMethod = paymentMethod ?? draft.paymentMethod;
     if (!isComboBooking && !selectedPaymentMethod) return;
     if (!expiresAt || expiresAt <= Date.now()) { handleExpired(); return; }
@@ -605,7 +554,7 @@ export function BookingConfirmPage() {
             <Button
               type="button"
               onClick={() => void handleConfirm()}
-              disabled={createBookingMutation.isPending || createVnpayCheckoutMutation.isPending || isReleasing || staffOptionsQuery.isPending || staffUnavailable || selectedStaffIds.length < 1}
+              disabled={createBookingMutation.isPending || createVnpayCheckoutMutation.isPending || isReleasing}
               className="rounded-xl gap-2 px-8 font-bold"
             >
               {createBookingMutation.isPending || createVnpayCheckoutMutation.isPending ? (
